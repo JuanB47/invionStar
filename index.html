@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>INVIONSTAR</title>
+    
+    <!-- Favicon de la pestaña usando tu logo transparente de public/logo.png -->
+    <link rel="icon" type="image/png" href="/logo.png" />
+
+    <!-- Importación de la tipografía Montserrat -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- CDN Tailwind CSS + Configuración de colores INVIONSTAR -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              invion: {
+                dark: '#0D1B2A',
+                navy: '#102A43',
+                turquoise: '#16B3B0',
+                mint: '#7FD9D6',
+                grayLight: '#F2F4F7',
+              }
+            },
+            fontFamily: {
+              sans: ['Montserrat', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
+  </head>
+  <body class="bg-[#F2F4F7] font-sans text-slate-900 antialiased">
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
