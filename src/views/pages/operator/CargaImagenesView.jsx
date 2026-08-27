@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Sidebar } from '../../components/layout/Sidebar';
 
 // NUEVA URL de la Web App desplegada en Google Apps Script
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwiawnomA7Sp3PRJhLSWPQZMqWomyDZofhDRSNm4TH78joMXHjXiSZoabh0H6oFKlLOqQ/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzNtiNr92bH9EPd4jIGN1h7LhfVaq8vjBqVCJNslsCGTU_PaHHHgKNwW0x9mXfsqF-5OA/exec';
 
 // Utilidad para convertir File a Base64 puro
 const fileToBase64 = (file) => {
@@ -113,11 +113,11 @@ export const CargaImagenesView = ({ user, onLogout }) => {
         console.log('Resultado del guardado en Supabase:', result);
       }
 
-      alert('¡Planilla procesada y guardada en Supabase con éxito!');
+      alert('¡Planilla procesada ballesterosss y guardada en Supabase con éxito!');
       setUploadedFiles([]);
     } catch (error) {
       console.error('Error en el procesamiento:', error);
-      alert(`Error al procesar: ${error.message}`);
+      alert(`Error ballesterossss al procesar: ${error.message}`);
     } finally {
       setIsProcessing(false);
     }
