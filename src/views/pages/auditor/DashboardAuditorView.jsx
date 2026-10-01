@@ -8,6 +8,9 @@ export const DashboardAuditorView = ({ user, onLogout }) => {
   const [activeMenu, setActiveMenu] = useState('Dashboard');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
+  // URL del informe generado en Looker Studio
+  const LOOKER_STUDIO_URL = "https://datastudio.google.com/embed/reporting/0a8e78c8-f83c-4489-bb10-ff8c3202c7f2/page/ht79F";
+
   // Generar iniciales dinámicas para el avatar
   const getUserInitials = (name) => {
     if (!name) return 'AU';
@@ -19,7 +22,7 @@ export const DashboardAuditorView = ({ user, onLogout }) => {
       .toUpperCase();
   };
 
-  // Definición del menú exclusivo para el Auditor
+  // Menú exclusivo para el Auditor
   const auditorMenuItems = [
     { name: 'Dashboard', icon: '🏠' },
     { name: 'Chat IA', icon: '🤖' },
@@ -88,7 +91,9 @@ export const DashboardAuditorView = ({ user, onLogout }) => {
           </div>
         </header>
 
-        {/* Renderizado Dinámico según el Submenú Seleccionado */}
+        {/* ========================================================= */}
+        {/* 1. SUBMENÚ: DASHBOARD PRINCIPAL */}
+        {/* ========================================================= */}
         {activeMenu === 'Dashboard' && (
           <>
             {/* Tarjetas KPI */}
@@ -196,7 +201,9 @@ export const DashboardAuditorView = ({ user, onLogout }) => {
           </>
         )}
 
-        {/* Vista del Chat IA */}
+        {/* ========================================================= */}
+        {/* 2. SUBMENÚ: CHAT IA */}
+        {/* ========================================================= */}
         {activeMenu === 'Chat IA' && (
           <div className="rounded-2xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-800">
             <ChatIAView 
@@ -210,13 +217,40 @@ export const DashboardAuditorView = ({ user, onLogout }) => {
           </div>
         )}
 
-        {/* Vista de Edición de Precios y Bodega */}
+        {/* ========================================================= */}
+        {/* 3. SUBMENÚ: PRECIOS Y BODEGA */}
+        {/* ========================================================= */}
         {activeMenu === 'Precios y Bodega' && (
           <div className={`p-6 rounded-2xl border ${isDarkMode ? 'bg-[#0D1B2A] border-[#1E293B]' : 'bg-white border-slate-200'}`}>
             <h2 className="text-lg font-bold mb-2">Gestión de Precios y Ajuste de Bodega</h2>
             <p className="text-sm text-slate-400 mb-4">Módulo exclusivo para actualización de precios de lista y reasignación de stock en bodega.</p>
             <div className="p-8 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl text-center text-slate-400">
               ⚙️ Formulario de edición de precios en construcción.
+            </div>
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* 4. SUBMENÚ: REPORTES Y MÉTRICAS (LOOKER STUDIO) */}
+        {/* ========================================================= */}
+        {activeMenu === 'Reportes y Métricas' && (
+          <div className={`p-4 md:p-6 rounded-2xl border ${isDarkMode ? 'bg-[#0D1B2A] border-[#1E293B]' : 'bg-white border-slate-200'}`}>
+            <div className="mb-4">
+              <h2 className="text-lg font-bold">Informe Ejecutivo de Auditoría</h2>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Visualización consolidada en tiempo real de Kardex, faltantes y mercancía dañada.
+              </p>
+            </div>
+            
+            {/* Contenedor Iframe con altura adaptable */}
+            <div className="w-full h-[750px] rounded-xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-800 bg-white">
+              <iframe
+                src={LOOKER_STUDIO_URL}
+                title="INVIONSTAR - Reporte Looker Studio"
+                className="w-full h-full border-none"
+                allowFullScreen
+                sandbox="allow-storage-access-by-user-activation allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+              />
             </div>
           </div>
         )}
