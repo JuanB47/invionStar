@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Sidebar } from '../../components/layout/Sidebar';
 
 // NUEVA URL de la Web App desplegada en Google Apps Script
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzNtiNr92bH9EPd4jIGN1h7LhfVaq8vjBqVCJNslsCGTU_PaHHHgKNwW0x9mXfsqF-5OA/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz1rsUY7qAMesAQrgaAT80ckpAk4DVUf7txthyWNkQ_WHCcO6kxugEXAbHnnDfgK5tsXg/exec';
 
 // Utilidad para convertir File a Base64 puro
 const fileToBase64 = (file) => {
