@@ -1,10 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Sidebar } from '../../components/layout/Sidebar';
 
-// NUEVA URL de la Web App desplegada en Google Apps Script
+// URL de la Web App desplegada en Google Apps Script
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz1rsUY7qAMesAQrgaAT80ckpAk4DVUf7txthyWNkQ_WHCcO6kxugEXAbHnnDfgK5tsXg/exec';
 
-// Utilidad para convertir File a Base64 puro
 const fileToBase64 = (file) => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -22,19 +21,52 @@ export const CargaImagenesView = ({ user, onLogout }) => {
   const [activeMenu, setActiveMenu] = useState('Cargar Imágenes');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  // Estados para gestión de archivos
+  // Estados para gestión de archivos e historial
   const [selectedCategory, setSelectedCategory] = useState('Stock Estantería');
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  
+  // Estado para el historial
+  const [historialCargas, setHistorialCargas] = useState([]);
+  const [isLoadingHistorial, setIsLoadingHistorial] = useState(false);
+
   const fileInputRef = useRef(null);
 
-  // Menú del Operador
+  // Menú exclusivo del Operador
   const operatorMenuItems = [
     { name: 'Cargar Imágenes', icon: '📸' },
     { name: 'Historial Cargas', icon: '📋' },
-    { name: 'Sincronización', icon: '🔄' },
   ];
+
+  // Cargar el historial al cambiar a la pestaña "Historial Cargas"
+  useEffect(() => {
+    if (activeMenu === 'Historial Cargas') {
+      fetchHistorial();
+    }
+  }, [activeMenu]);
+
+  const fetchHistorial = async () => {
+    setIsLoadingHistorial(true);
+    try {
+      const response = await fetch(APPS_SCRIPT_URL, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+      });
+      const result = await response.json();
+      if (result.success && result.data) {
+        setHistorialCargas(result.data);
+      } else {
+        console.error('Error al obtener historial:', result.message);
+      }
+    } catch (error) {
+      console.error('Error de red al consultar historial:', error);
+    } finally {
+      setIsLoadingHistorial(false);
+    }
+  };
 
   const handleFiles = (files) => {
     const validFiles = Array.from(files).filter((file) =>
@@ -80,7 +112,6 @@ export const CargaImagenesView = ({ user, onLogout }) => {
     );
   };
 
-  // Procesamiento y envío sincronizado con el backend y Supabase
   const handleProcessUploads = async () => {
     if (uploadedFiles.length === 0) return;
     setIsProcessing(true);
@@ -89,7 +120,6 @@ export const CargaImagenesView = ({ user, onLogout }) => {
       for (const item of uploadedFiles) {
         const base64Data = await fileToBase64(item.file);
 
-        // Payload alineado con el nuevo Google Apps Script
         const payload = {
           imagenBase64: base64Data,
           operador_id: user?.id || user?.name || 'operador_anonimo'
@@ -105,28 +135,40 @@ export const CargaImagenesView = ({ user, onLogout }) => {
 
         const result = await response.json();
 
-        // Validación basada en la nueva respuesta del backend
         if (result.status === 'error' || result.success === false) {
           throw new Error(result.message || 'Error en el procesamiento del backend');
         }
-
-        console.log('Resultado del guardado en Supabase:', result);
       }
 
-      alert('¡Planilla procesada ballesterosss y guardada en Supabase con éxito!');
+      alert('¡Planilla procesada y guardada en Supabase con éxito!');
       setUploadedFiles([]);
     } catch (error) {
       console.error('Error en el procesamiento:', error);
-      alert(`Error ballesterossss al procesar: ${error.message}`);
+      alert(`Error al procesar: ${error.message}`);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const formatFechaEnvio = (timestampStr) => {
+    if (!timestampStr) return 'N/A';
+    try {
+      const date = new Date(timestampStr);
+      return date.toLocaleString('es-CO', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    } catch {
+      return timestampStr;
     }
   };
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-[#070F18] text-white' : 'bg-slate-100 text-slate-900'}`}>
       
-      {/* Botón Menú Móvil */}
       <button
         onClick={() => setIsMobileOpen(!isMobileOpen)}
         className="md:hidden fixed top-4 left-4 z-50 bg-[#0B1726] text-white p-2.5 rounded-lg shadow-lg"
@@ -134,7 +176,6 @@ export const CargaImagenesView = ({ user, onLogout }) => {
         ☰
       </button>
 
-      {/* Sidebar Reusable */}
       <Sidebar
         menuItems={operatorMenuItems}
         activeMenu={activeMenu}
@@ -144,10 +185,8 @@ export const CargaImagenesView = ({ user, onLogout }) => {
         onLogout={onLogout}
       />
 
-      {/* Main Content */}
       <main className="md:ml-60 p-4 md:p-8 pt-16 md:pt-8 transition-all">
         
-        {/* Header */}
         <header className="flex flex-wrap justify-between items-center gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold">{activeMenu}</h1>
@@ -178,8 +217,6 @@ export const CargaImagenesView = ({ user, onLogout }) => {
 
         {activeMenu === 'Cargar Imágenes' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            
-            {/* Panel Izquierdo */}
             <div className="lg:col-span-1 space-y-4">
               <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-[#0D1B2A] border-[#1E293B]' : 'bg-white border-slate-200'}`}>
                 <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
@@ -236,7 +273,6 @@ export const CargaImagenesView = ({ user, onLogout }) => {
               </div>
             </div>
 
-            {/* Panel Derecho */}
             <div className="lg:col-span-2">
               <div className={`p-5 rounded-2xl border h-full flex flex-col ${isDarkMode ? 'bg-[#0D1B2A] border-[#1E293B]' : 'bg-white border-slate-200'}`}>
                 <div className="flex justify-between items-center mb-4">
@@ -317,14 +353,70 @@ export const CargaImagenesView = ({ user, onLogout }) => {
           </div>
         )}
 
-        {/* Historial */}
+        {/* Historial de Cargas Conectado */}
         {activeMenu === 'Historial Cargas' && (
           <div className={`p-6 rounded-2xl border ${isDarkMode ? 'bg-[#0D1B2A] border-[#1E293B]' : 'bg-white border-slate-200'}`}>
-            <h2 className="text-lg font-bold mb-2">Historial de Capturas Recientes</h2>
-            <p className="text-sm text-slate-400 mb-4">Registro de imágenes enviadas y su estado de sincronización.</p>
-            <div className="p-8 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl text-center text-slate-400">
-              📋 Lista de registros anteriores.
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h2 className="text-lg font-bold">Historial de Capturas Recientes</h2>
+                <p className="text-sm text-slate-400">Registro de imágenes procesadas en orden de envío.</p>
+              </div>
+              <button
+                onClick={fetchHistorial}
+                className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-100 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-700 transition-all flex items-center gap-1.5 shadow-sm"
+              >
+                🔄 Actualizar
+              </button>
             </div>
+
+            {isLoadingHistorial ? (
+              <div className="p-12 text-center text-slate-400 text-sm">
+                Cargando historial desde Supabase...
+              </div>
+            ) : historialCargas.length === 0 ? (
+              <div className="p-12 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl text-center text-slate-400">
+                📋 No hay registros de carga anteriores.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 text-xs uppercase tracking-wider">
+                      <th className="pb-3 font-semibold">ID Ingesta</th>
+                      <th className="pb-3 font-semibold">Fecha de Envío</th>
+                      <th className="pb-3 font-semibold">Responsable</th>
+                      <th className="pb-3 font-semibold">Operador</th>
+                      <th className="pb-3 font-semibold">Estado</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                    {historialCargas.map((row) => (
+                      <tr key={row.id} className="hover:bg-slate-500/5 transition-colors">
+                        <td className="py-3 font-mono text-xs text-slate-400 truncate max-w-[100px]" title={row.id}>
+                          #{row.id ? row.id.substring(0, 8) : 'N/A'}
+                        </td>
+                        <td className="py-3 font-medium">{formatFechaEnvio(row.creado_en)}</td>
+                        <td className="py-3">{row.responsable_surtidor || 'N/A'}</td>
+                        <td className="py-3">
+                          <span className="px-2.5 py-1 rounded-md text-xs bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100 font-semibold inline-block border border-slate-300 dark:border-slate-600 shadow-sm">
+                            {row.operador_id}
+                          </span>
+                        </td>
+                        <td className="py-3">
+                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                            row.estado_aprobacion === 'APROBADO' 
+                              ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' 
+                              : 'bg-amber-500/10 text-amber-500 border border-amber-500/20'
+                          }`}>
+                            {row.estado_aprobacion || 'PENDIENTE'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </main>

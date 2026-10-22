@@ -1,17 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Sidebar } from '../../components/layout/Sidebar';
 import { KpiCard } from '../../components/common/KpiCard';
 import { ChatIAView } from './ChatIAView';
+
+// URL de tu Web App desplegada en Google Apps Script
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz1rsUY7qAMesAQrgaAT80ckpAk4DVUf7txthyWNkQ_WHCcO6kxugEXAbHnnDfgK5tsXg/exec';
 
 export const DashboardAuditorView = ({ user, onLogout }) => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [activeMenu, setActiveMenu] = useState('Dashboard');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
+  // =========================================================
+  // ESTADOS Y MANEJO DEL CHAT IA (INTACTO Y FUNCIONAL)
+  // =========================================================
+  const [messages, setMessages] = useState([
+    { sender: 'assistant', text: 'Hola Auditor. Estoy conectado al Kardex Consolidado de Google Sheets. ¿Qué deseas consultar hoy?' }
+  ]);
+  const [inputQuery, setInputQuery] = useState('');
+  const [isLoadingChat, setIsLoadingChat] = useState(false);
+
   // URL del informe generado en Looker Studio
   const LOOKER_STUDIO_URL = "https://datastudio.google.com/embed/reporting/0a8e78c8-f83c-4489-bb10-ff8c3202c7f2/page/ht79F";
 
-  // Generar iniciales dinámicas para el avatar
   const getUserInitials = (name) => {
     if (!name) return 'AU';
     return name
@@ -22,13 +33,55 @@ export const DashboardAuditorView = ({ user, onLogout }) => {
       .toUpperCase();
   };
 
-  // Menú exclusivo para el Auditor
   const auditorMenuItems = [
     { name: 'Dashboard', icon: '🏠' },
     { name: 'Chat IA', icon: '🤖' },
     { name: 'Precios y Bodega', icon: '🏷️' },
     { name: 'Reportes y Métricas', icon: '📊' },
   ];
+
+  // Manejador del Chat IA
+  const handleSendChat = async (e) => {
+    e.preventDefault();
+    if (!inputQuery.trim() || isLoadingChat) return;
+
+    const userMessage = inputQuery.trim();
+    setInputQuery('');
+
+    setMessages((prev) => [...prev, { sender: 'user', text: userMessage }]);
+    setIsLoadingChat(true);
+
+    try {
+      const payload = {
+        action: "CHAT_KARDEX",
+        pregunta: userMessage
+      };
+
+      const response = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+      });
+
+      const result = await response.json();
+
+      if (result.status === 'error' || result.success === false) {
+        throw new Error(result.message || 'Error en la respuesta del backend');
+      }
+
+      setMessages((prev) => [...prev, { sender: 'assistant', text: result.respuesta }]);
+    } catch (error) {
+      console.error('Error en el chat:', error);
+      setMessages((prev) => [
+        ...prev, 
+        { sender: 'assistant', text: `⚠️ Error al consultar el Kardex: ${error.message}` }
+      ]);
+    } finally {
+      setIsLoadingChat(false);
+    }
+  };
 
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-[#070F18] text-white' : 'bg-slate-100 text-slate-900'}`}>
@@ -96,7 +149,6 @@ export const DashboardAuditorView = ({ user, onLogout }) => {
         {/* ========================================================= */}
         {activeMenu === 'Dashboard' && (
           <>
-            {/* Tarjetas KPI */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
               <KpiCard title="STOCK TOTAL" value="1.256" isDarkMode={isDarkMode} />
               <KpiCard title="ENTRADAS (HOY)" value="325" isDarkMode={isDarkMode} />
@@ -104,7 +156,6 @@ export const DashboardAuditorView = ({ user, onLogout }) => {
               <KpiCard title="PÉRDIDAS (HOY)" value="12" isDarkMode={isDarkMode} />
             </div>
 
-            {/* Sección Gráficos y Porcentajes */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
               <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-[#0D1B2A] border-[#1E293B]' : 'bg-white border-slate-200'}`}>
                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">RESUMEN DE INVENTARIO</h3>
@@ -133,101 +184,29 @@ export const DashboardAuditorView = ({ user, onLogout }) => {
                 </div>
               </div>
             </div>
-
-            {/* Tablas Inferiores */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Productos Bajo Stock */}
-              <div className={`p-5 rounded-2xl border overflow-x-auto ${isDarkMode ? 'bg-[#0D1B2A] border-[#1E293B]' : 'bg-white border-slate-200'}`}>
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">PRODUCTOS BAJO STOCK</h3>
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
-                      <th className="pb-2 font-semibold">Producto</th>
-                      <th className="pb-2 font-semibold">Stock</th>
-                      <th className="pb-2 font-semibold">Mínimo</th>
-                      <th className="pb-2 font-semibold">Estado</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                    {[
-                      { name: 'Arroz 1Kg', stock: 12, min: 50, status: 'Crítico', color: 'bg-red-500' },
-                      { name: 'Aceite 1L', stock: 8, min: 30, status: 'Crítico', color: 'bg-red-500' },
-                      { name: 'Leche 1L', stock: 6, min: 20, status: 'Bajo', color: 'bg-amber-500' },
-                    ].map((row, i) => (
-                      <tr key={i}>
-                        <td className="py-3 font-medium">{row.name}</td>
-                        <td className="py-3">{row.stock}</td>
-                        <td className="py-3">{row.min}</td>
-                        <td className="py-3">
-                          <span className={`${row.color} text-white px-2 py-0.5 rounded-md text-xs font-bold`}>
-                            {row.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Movimientos Recientes */}
-              <div className={`p-5 rounded-2xl border overflow-x-auto ${isDarkMode ? 'bg-[#0D1B2A] border-[#1E293B]' : 'bg-white border-slate-200'}`}>
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">MOVIMIENTOS RECIENTES</h3>
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
-                      <th className="pb-2 font-semibold">Tipo</th>
-                      <th className="pb-2 font-semibold">Producto</th>
-                      <th className="pb-2 font-semibold">Cant.</th>
-                      <th className="pb-2 font-semibold">Usuario</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                    {[
-                      { type: 'Entrada', prod: 'Aceite 1L', cant: '50 Und', user: 'Carlos' },
-                      { type: 'Salida', prod: 'Arroz 1Kg', cant: '20 Und', user: 'María' },
-                      { type: 'Pérdida', prod: 'Leche 1L', cant: '5 Und', user: 'Juan' },
-                    ].map((row, i) => (
-                      <tr key={i}>
-                        <td className="py-3 font-medium">{row.type}</td>
-                        <td className="py-3">{row.prod}</td>
-                        <td className="py-3">{row.cant}</td>
-                        <td className="py-3">{row.user}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
           </>
         )}
 
         {/* ========================================================= */}
-        {/* 2. SUBMENÚ: CHAT IA */}
+        {/* 2. SUBMENÚ: CHAT IA (PROTEGIDO Y FUNCIONAL) */}
         {/* ========================================================= */}
         {activeMenu === 'Chat IA' && (
           <div className="rounded-2xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-800">
             <ChatIAView 
-              messages={[
-                { sender: 'assistant', text: 'Hola Auditor. Estoy conectado a la Base de Datos y a los Google Sheets. ¿Qué deseas consultar hoy?' }
-              ]}
-              inputQuery=""
-              onInputChange={() => {}}
-              onSend={(e) => e.preventDefault()}
+              messages={messages}
+              inputQuery={inputQuery}
+              onInputChange={(e) => setInputQuery(e.target.value)}
+              onSend={handleSendChat}
+              isLoading={isLoadingChat}
             />
           </div>
         )}
 
         {/* ========================================================= */}
-        {/* 3. SUBMENÚ: PRECIOS Y BODEGA */}
+        {/* 3. SUBMENÚ: PRECIOS Y BODEGA (CRUD CONECTADO A SUPABASE) */}
         {/* ========================================================= */}
         {activeMenu === 'Precios y Bodega' && (
-          <div className={`p-6 rounded-2xl border ${isDarkMode ? 'bg-[#0D1B2A] border-[#1E293B]' : 'bg-white border-slate-200'}`}>
-            <h2 className="text-lg font-bold mb-2">Gestión de Precios y Ajuste de Bodega</h2>
-            <p className="text-sm text-slate-400 mb-4">Módulo exclusivo para actualización de precios de lista y reasignación de stock en bodega.</p>
-            <div className="p-8 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl text-center text-slate-400">
-              ⚙️ Formulario de edición de precios en construcción.
-            </div>
-          </div>
+          <PreciosBodegaModule isDarkMode={isDarkMode} />
         )}
 
         {/* ========================================================= */}
@@ -242,7 +221,6 @@ export const DashboardAuditorView = ({ user, onLogout }) => {
               </p>
             </div>
             
-            {/* Contenedor Iframe con altura adaptable */}
             <div className="w-full h-[750px] rounded-xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-800 bg-white">
               <iframe
                 src={LOOKER_STUDIO_URL}
@@ -259,3 +237,406 @@ export const DashboardAuditorView = ({ user, onLogout }) => {
     </div>
   );
 };
+
+// =========================================================
+// MÓDULO PRECIOS Y BODEGA CON FETCH SEGURO (TEXT/PLAIN)
+// =========================================================
+function PreciosBodegaModule({ isDarkMode }) {
+  const [activeTab, setActiveTab] = useState('productos'); // 'productos' | 'bodegas'
+  const [productos, setProductos] = useState([]);
+  const [bodegas, setBodegas] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  // Estados de formularios
+  const [formProd, setFormProd] = useState({ codigo_item: '', nombre: '', categoria: '', precio: '' });
+  const [formBodega, setFormBodega] = useState({ id: '', nombre: '', direccion: '', telefono: '', encargado: '' });
+
+  // Petición genérica via fetch con text/plain para evitar bloqueos CORS
+  const callBackend = async (payload) => {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8',
+      },
+    });
+    return await res.json();
+  };
+
+  // Cargar datos en vivo desde Supabase
+  const cargarDatosBD = async () => {
+    setLoading(true);
+    try {
+      const data = await callBackend({ action: "OBTENER_DATOS_PB" });
+      if (data.success) {
+        setProductos(data.productos || []);
+        setBodegas(data.bodegas || []);
+      } else {
+        alert("Error al cargar datos desde Supabase: " + data.message);
+      }
+    } catch (err) {
+      console.error("Error consultando la BD:", err);
+      alert("Error al conectar con la base de datos: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    cargarDatosBD();
+  }, []);
+
+  // --- ACCIONES DE PRODUCTOS ---
+  const handleGuardarProducto = async (e) => {
+    e.preventDefault();
+    if (!formProd.codigo_item || !formProd.nombre || !formProd.precio) {
+      alert("Por favor completa los campos del producto.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const res = await callBackend({
+        action: "GUARDAR_PRODUCTO_PB",
+        producto: formProd
+      });
+
+      if (res.success) {
+        setFormProd({ codigo_item: '', nombre: '', categoria: '', precio: '' });
+        await cargarDatosBD();
+      } else {
+        alert("Error al guardar producto: " + res.message);
+      }
+    } catch (err) {
+      alert("Error al guardar: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditarProducto = (prod) => {
+    setFormProd(prod);
+  };
+
+  const handleEliminarProducto = async (codigoItem) => {
+    if (!window.confirm(`¿Seguro que deseas eliminar el producto ${codigoItem}?`)) return;
+
+    setLoading(true);
+    try {
+      const res = await callBackend({
+        action: "ELIMINAR_PRODUCTO_PB",
+        codigoItem: codigoItem
+      });
+
+      if (res.success) {
+        await cargarDatosBD();
+      } else {
+        alert("Error al eliminar producto: " + res.message);
+      }
+    } catch (err) {
+      alert("Error al eliminar: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- ACCIONES DE BODEGAS ---
+  const handleGuardarBodega = async (e) => {
+    e.preventDefault();
+    if (!formBodega.nombre || !formBodega.direccion) {
+      alert("Por favor completa el nombre y la dirección de la bodega.");
+      return;
+    }
+
+    const payloadBodega = {
+      ...formBodega,
+      id: formBodega.id ? Number(formBodega.id) : undefined
+    };
+
+    setLoading(true);
+    try {
+      const res = await callBackend({
+        action: "GUARDAR_BODEGA_PB",
+        bodega: payloadBodega
+      });
+
+      if (res.success) {
+        setFormBodega({ id: '', nombre: '', direccion: '', telefono: '', encargado: '' });
+        await cargarDatosBD();
+      } else {
+        alert("Error al guardar bodega: " + res.message);
+      }
+    } catch (err) {
+      alert("Error al guardar bodega: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditarBodega = (bod) => {
+    setFormBodega(bod);
+  };
+
+  const handleEliminarBodega = async (id) => {
+    if (!window.confirm("¿Seguro que deseas eliminar esta bodega?")) return;
+
+    setLoading(true);
+    try {
+      const res = await callBackend({
+        action: "ELIMINAR_BODEGA_PB",
+        idBodega: id
+      });
+
+      if (res.success) {
+        await cargarDatosBD();
+      } else {
+        alert("Error al eliminar bodega: " + res.message);
+      }
+    } catch (err) {
+      alert("Error al eliminar bodega: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      
+      {/* PESTAÑAS (TABS) Y BOTÓN DE REFRESCAR BD */}
+      <div className="flex flex-wrap justify-between items-center gap-4 pb-2 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setActiveTab('productos')}
+            className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              activeTab === 'productos'
+                ? 'bg-[#16B3B0] text-white shadow-md'
+                : isDarkMode ? 'bg-[#0D1B2A] text-slate-400 hover:text-white' : 'bg-white text-slate-600'
+            }`}
+          >
+            <span>🏷️</span> Productos (`inv_productos`)
+          </button>
+
+          <button
+            onClick={() => setActiveTab('bodegas')}
+            className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${
+              activeTab === 'bodegas'
+                ? 'bg-[#16B3B0] text-white shadow-md'
+                : isDarkMode ? 'bg-[#0D1B2A] text-slate-400 hover:text-white' : 'bg-white text-slate-600'
+            }`}
+          >
+            <span>🏢</span> Bodegas Registradas (`bodegas`)
+          </button>
+        </div>
+
+        <button
+          onClick={cargarDatosBD}
+          disabled={loading}
+          className={`px-4 py-2.5 rounded-xl text-xs font-bold border transition-all flex items-center gap-2 ${
+            loading ? 'opacity-50 cursor-not-allowed' : 'hover:bg-[#16B3B0] hover:text-white hover:border-[#16B3B0]'
+          } ${isDarkMode ? 'bg-[#0D1B2A] text-slate-300 border-slate-700' : 'bg-white text-slate-700 border-slate-300 shadow-sm'}`}
+        >
+          <span>{loading ? '⏳' : '🔄'}</span>
+          <span>{loading ? 'Cargando BD...' : 'Actualizar de BD'}</span>
+        </button>
+      </div>
+
+      {/* ========================================================= */}
+      {/* PESTAÑA 1: PRODUCTOS (`inv_productos`) */}
+      {/* ========================================================= */}
+      {activeTab === 'productos' && (
+        <div className="space-y-6">
+          {/* FORMULARIO SUPERIOR: AGREGAR / EDITAR */}
+          <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-[#0D1B2A] border-[#1E293B]' : 'bg-white border-slate-200'}`}>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">REGISTRAR O ACTUALIZAR PRODUCTO (`INV_PRODUCTOS`)</h3>
+            <form onSubmit={handleGuardarProducto} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              <input
+                type="text"
+                placeholder="Código Item (Ej: ART-011)"
+                value={formProd.codigo_item}
+                onChange={(e) => setFormProd({ ...formProd, codigo_item: e.target.value })}
+                className={`p-2.5 rounded-xl border text-xs outline-none ${isDarkMode ? 'bg-[#070F18] border-slate-700 text-white' : 'bg-slate-50 border-slate-200'}`}
+                required
+              />
+              <input
+                type="text"
+                placeholder="Nombre del Producto"
+                value={formProd.nombre}
+                onChange={(e) => setFormProd({ ...formProd, nombre: e.target.value })}
+                className={`p-2.5 rounded-xl border text-xs outline-none ${isDarkMode ? 'bg-[#070F18] border-slate-700 text-white' : 'bg-slate-50 border-slate-200'}`}
+                required
+              />
+              <input
+                type="text"
+                placeholder="Categoría"
+                value={formProd.categoria}
+                onChange={(e) => setFormProd({ ...formProd, categoria: e.target.value })}
+                className={`p-2.5 rounded-xl border text-xs outline-none ${isDarkMode ? 'bg-[#070F18] border-slate-700 text-white' : 'bg-slate-50 border-slate-200'}`}
+              />
+              <input
+                type="text"
+                placeholder="Precio (Ej: $5.000)"
+                value={formProd.precio}
+                onChange={(e) => setFormProd({ ...formProd, precio: e.target.value })}
+                className={`p-2.5 rounded-xl border text-xs outline-none ${isDarkMode ? 'bg-[#070F18] border-slate-700 text-white' : 'bg-slate-50 border-slate-200'}`}
+                required
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="bg-[#16B3B0] hover:bg-[#139693] text-white font-bold text-xs rounded-xl py-2.5 transition-all shadow-sm"
+              >
+                {formProd.codigo_item && productos.some(p => p.codigo_item === formProd.codigo_item) ? 'Actualizar Producto' : 'Crear Producto'}
+              </button>
+            </form>
+          </div>
+
+          {/* TABLA INFERIOR DE PRODUCTOS */}
+          <div className={`p-5 rounded-2xl border overflow-x-auto ${isDarkMode ? 'bg-[#0D1B2A] border-[#1E293B]' : 'bg-white border-slate-200'}`}>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">LISTADO DE PRODUCTOS EN SUPABASE ({productos.length})</h3>
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
+                  <th className="pb-2 font-semibold">Código</th>
+                  <th className="pb-2 font-semibold">Nombre</th>
+                  <th className="pb-2 font-semibold">Categoría</th>
+                  <th className="pb-2 font-semibold">Precio</th>
+                  <th className="pb-2 font-semibold text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                {productos.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="py-6 text-center text-slate-400 text-xs">No hay productos registrados en la base de datos.</td>
+                  </tr>
+                ) : (
+                  productos.map((prod) => (
+                    <tr key={prod.codigo_item}>
+                      <td className="py-3 font-bold">{prod.codigo_item}</td>
+                      <td className="py-3">{prod.nombre}</td>
+                      <td className="py-3 text-slate-400">{prod.categoria}</td>
+                      <td className="py-3 font-extrabold text-[#16B3B0]">{prod.precio}</td>
+                      <td className="py-3 text-right space-x-2">
+                        <button
+                          onClick={() => handleEditarProducto(prod)}
+                          className="px-3 py-1 rounded-lg bg-amber-500/10 text-amber-500 text-xs font-bold hover:bg-amber-500 hover:text-white transition-all"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleEliminarProducto(prod.codigo_item)}
+                          className="px-3 py-1 rounded-lg bg-red-500/10 text-red-500 text-xs font-bold hover:bg-red-500 hover:text-white transition-all"
+                        >
+                          Eliminar
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* PESTAÑA 2: BODEGAS (`bodegas`) */}
+      {/* ========================================================= */}
+      {activeTab === 'bodegas' && (
+        <div className="space-y-6">
+          {/* FORMULARIO SUPERIOR: AGREGAR / EDITAR */}
+          <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-[#0D1B2A] border-[#1E293B]' : 'bg-white border-slate-200'}`}>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">REGISTRAR O ACTUALIZAR BODEGA (`BODEGAS`)</h3>
+            <form onSubmit={handleGuardarBodega} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+              <input
+                type="text"
+                placeholder="Nombre de la Bodega"
+                value={formBodega.nombre}
+                onChange={(e) => setFormBodega({ ...formBodega, nombre: e.target.value })}
+                className={`p-2.5 rounded-xl border text-xs outline-none ${isDarkMode ? 'bg-[#070F18] border-slate-700 text-white' : 'bg-slate-50 border-slate-200'}`}
+                required
+              />
+              <input
+                type="text"
+                placeholder="Dirección"
+                value={formBodega.direccion}
+                onChange={(e) => setFormBodega({ ...formBodega, direccion: e.target.value })}
+                className={`p-2.5 rounded-xl border text-xs outline-none ${isDarkMode ? 'bg-[#070F18] border-slate-700 text-white' : 'bg-slate-50 border-slate-200'}`}
+                required
+              />
+              <input
+                type="text"
+                placeholder="Teléfono"
+                value={formBodega.telefono}
+                onChange={(e) => setFormBodega({ ...formBodega, telefono: e.target.value })}
+                className={`p-2.5 rounded-xl border text-xs outline-none ${isDarkMode ? 'bg-[#070F18] border-slate-700 text-white' : 'bg-slate-50 border-slate-200'}`}
+              />
+              <input
+                type="text"
+                placeholder="Encargado"
+                value={formBodega.encargado}
+                onChange={(e) => setFormBodega({ ...formBodega, encargado: e.target.value })}
+                className={`p-2.5 rounded-xl border text-xs outline-none ${isDarkMode ? 'bg-[#070F18] border-slate-700 text-white' : 'bg-slate-50 border-slate-200'}`}
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="bg-[#16B3B0] hover:bg-[#139693] text-white font-bold text-xs rounded-xl py-2.5 transition-all shadow-sm"
+              >
+                {formBodega.id ? 'Actualizar Bodega' : 'Crear Bodega'}
+              </button>
+            </form>
+          </div>
+
+          {/* TABLA INFERIOR DE BODEGAS */}
+          <div className={`p-5 rounded-2xl border overflow-x-auto ${isDarkMode ? 'bg-[#0D1B2A] border-[#1E293B]' : 'bg-white border-slate-200'}`}>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">BODEGAS REGISTRADAS EN SUPABASE ({bodegas.length})</h3>
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 text-xs">
+                  <th className="pb-2 font-semibold">ID</th>
+                  <th className="pb-2 font-semibold">Nombre</th>
+                  <th className="pb-2 font-semibold">Dirección</th>
+                  <th className="pb-2 font-semibold">Teléfono</th>
+                  <th className="pb-2 font-semibold">Encargado</th>
+                  <th className="pb-2 font-semibold text-right">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                {bodegas.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="py-6 text-center text-slate-400 text-xs">No hay bodegas registradas en la base de datos.</td>
+                  </tr>
+                ) : (
+                  bodegas.map((bod) => (
+                    <tr key={bod.id || bod.nombre}>
+                      <td className="py-3 font-bold">{bod.id || 'N/A'}</td>
+                      <td className="py-3 font-bold text-[#16B3B0]">{bod.nombre}</td>
+                      <td className="py-3">{bod.direccion}</td>
+                      <td className="py-3 text-slate-400">{bod.telefono || 'N/A'}</td>
+                      <td className="py-3 text-slate-400">{bod.encargado || 'N/A'}</td>
+                      <td className="py-3 text-right space-x-2">
+                        <button
+                          onClick={() => handleEditarBodega(bod)}
+                          className="px-3 py-1 rounded-lg bg-amber-500/10 text-amber-500 text-xs font-bold hover:bg-amber-500 hover:text-white transition-all"
+                        >
+                          Editar
+                        </button>
+                        <button
+                          onClick={() => handleEliminarBodega(bod.id)}
+                          className="px-3 py-1 rounded-lg bg-red-500/10 text-red-500 text-xs font-bold hover:bg-red-500 hover:text-white transition-all"
+                        >
+                          Eliminar
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+    </div>
+  );
+}

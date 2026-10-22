@@ -1,17 +1,17 @@
 import React from 'react';
 import { Button } from '../../components/common/Button';
 
-export const ChatIAView = ({ messages, inputQuery, onInputChange, onSend }) => {
+export const ChatIAView = ({ messages, inputQuery, onInputChange, onSend, isLoading }) => {
   return (
-    <div className="flex flex-col h-screen bg-invion-grayLight max-w-2xl mx-auto border-x border-gray-200">
+    <div className="flex flex-col h-[70vh] bg-invion-grayLight max-w-3xl mx-auto border-x border-gray-200 rounded-2xl overflow-hidden">
       {/* Header del Chat */}
       <div className="bg-invion-dark text-white p-4 flex items-center gap-3 shadow-md">
         <div className="w-8 h-8 rounded-full bg-invion-turquoise flex items-center justify-center font-bold text-sm">
           🤖
         </div>
         <div>
-          <h3 className="text-sm font-bold">Asistente INVION</h3>
-          <p className="text-[10px] text-invion-mint">IA conectada a la Base de Datos</p>
+          <h3 className="text-sm font-bold">Asistente INVION (Kardex IA)</h3>
+          <p className="text-[10px] text-invion-mint">Conectado a Google Sheets & Gemini</p>
         </div>
       </div>
 
@@ -23,7 +23,7 @@ export const ChatIAView = ({ messages, inputQuery, onInputChange, onSend }) => {
             className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}
           >
             <div
-              className={`max-w-[80%] p-3.5 rounded-2xl text-xs leading-relaxed ${
+              className={`max-w-[80%] p-3.5 rounded-2xl text-xs leading-relaxed whitespace-pre-wrap ${
                 msg.sender === 'user'
                   ? 'bg-invion-turquoise text-white rounded-br-none'
                   : 'bg-white text-invion-dark border border-gray-200 shadow-sm rounded-bl-none'
@@ -33,6 +33,14 @@ export const ChatIAView = ({ messages, inputQuery, onInputChange, onSend }) => {
             </div>
           </div>
         ))}
+
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="bg-white text-slate-500 border border-gray-200 p-3.5 rounded-2xl rounded-bl-none text-xs animate-pulse">
+              🔍 Analizando Kardex Consolidado...
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Input de Pregunta */}
@@ -41,11 +49,12 @@ export const ChatIAView = ({ messages, inputQuery, onInputChange, onSend }) => {
           type="text"
           value={inputQuery}
           onChange={onInputChange}
-          placeholder="Escribe tu pregunta sobre el inventario..."
-          className="flex-1 px-4 py-2.5 bg-invion-grayLight text-xs text-invion-dark rounded-xl focus:outline-none border border-transparent focus:border-invion-turquoise"
+          placeholder="Ej: ¿Qué productos tienen faltantes o mercancía dañada?"
+          disabled={isLoading}
+          className="flex-1 px-4 py-2.5 bg-invion-grayLight text-xs text-invion-dark rounded-xl focus:outline-none border border-transparent focus:border-invion-turquoise disabled:opacity-50"
         />
-        <Button type="submit" variant="primary" className="!w-auto !px-4">
-          Enviar
+        <Button type="submit" variant="primary" className="!w-auto !px-4" disabled={isLoading}>
+          {isLoading ? 'Enviando...' : 'Enviar'}
         </Button>
       </form>
     </div>
