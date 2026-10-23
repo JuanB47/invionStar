@@ -3,7 +3,7 @@ import { Sidebar } from '../../components/layout/Sidebar';
 import { KpiCard } from '../../components/common/KpiCard';
 import { ChatIAView } from './ChatIAView';
 
-// URL de tu Web App desplegada en Google Apps Script
+// URL de la Web App desplegada en Google Apps Script
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz1rsUY7qAMesAQrgaAT80ckpAk4DVUf7txthyWNkQ_WHCcO6kxugEXAbHnnDfgK5tsXg/exec';
 
 export const DashboardAuditorView = ({ user, onLogout }) => {
@@ -11,16 +11,25 @@ export const DashboardAuditorView = ({ user, onLogout }) => {
   const [activeMenu, setActiveMenu] = useState('Dashboard');
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
-  // =========================================================
-  // ESTADOS Y MANEJO DEL CHAT IA (INTACTO Y FUNCIONAL)
-  // =========================================================
+  // ESTADOS Y MANEJO DEL CHAT IA
   const [messages, setMessages] = useState([
     { sender: 'assistant', text: 'Hola Auditor. Estoy conectado al Kardex Consolidado de Google Sheets. ¿Qué deseas consultar hoy?' }
   ]);
   const [inputQuery, setInputQuery] = useState('');
   const [isLoadingChat, setIsLoadingChat] = useState(false);
 
-  // URL del informe generado en Looker Studio
+  // ESTADOS PARA LA AUDITORÍA TOTAL DE MERMAS Y KPI REALES
+  const [auditoria, setAuditoria] = useState({
+    totalStock: "0",
+    totalEntradas: "0",
+    totalSalidas: "0",
+    totalPerdidaDinero: "$0",
+    totalFaltantes: 0,
+    totalDanados: 0,
+    itemsAfectados: []
+  });
+  const [loadingAuditoria, setLoadingAuditoria] = useState(false);
+
   const LOOKER_STUDIO_URL = "https://datastudio.google.com/embed/reporting/0a8e78c8-f83c-4489-bb10-ff8c3202c7f2/page/ht79F";
 
   const getUserInitials = (name) => {
@@ -40,7 +49,56 @@ export const DashboardAuditorView = ({ user, onLogout }) => {
     { name: 'Reportes y Métricas', icon: '📊' },
   ];
 
-  // Manejador del Chat IA
+  // Función con trazabilidad completa en consola para la auditoría total y KPIs
+  const fetchAuditoriaTotal = async () => {
+    setLoadingAuditoria(true);
+    console.group("🔍 [INVIONSTAR FRONTEND] Auditoría Total");
+    console.log("⏱️ Timestamp:", new Date().toISOString());
+    console.log("🌐 URL destino:", APPS_SCRIPT_URL);
+    
+    try {
+      const payload = { action: "OBTENER_AUDITORIA_TOTAL" };
+      console.log("📦 Payload enviado:", payload);
+
+      const response = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8',
+        },
+      });
+
+      const responseText = await response.text();
+      console.log("📄 Respuesta cruda del servidor:", responseText);
+
+      if (responseText.trim().startsWith("<!DOCTYPE") || responseText.trim().startsWith("<html")) {
+        console.error("❌ ERROR CRÍTICO: El servidor devolvió HTML (Fallo de permisos en SpreadsheetApp.openById).");
+        throw new Error("El backend devolvió una página HTML de error. Revisa los permisos de Google Sheets.");
+      }
+
+      const result = JSON.parse(responseText);
+      console.log("✅ JSON parseado con éxito:", result);
+
+      if (result.success) {
+        setAuditoria(result);
+      } else {
+        console.warn("⚠️ El backend respondió con éxito falso:", result.message);
+      }
+    } catch (error) {
+      console.error("🔥 Error capturado en el bloque catch:", error.message);
+    } finally {
+      console.groupEnd();
+      setLoadingAuditoria(false);
+    }
+  };
+
+  // Cargar datos de auditoría al iniciar el Dashboard
+  useEffect(() => {
+    if (activeMenu === 'Dashboard') {
+      fetchAuditoriaTotal();
+    }
+  }, [activeMenu]);
+
   const handleSendChat = async (e) => {
     e.preventDefault();
     if (!inputQuery.trim() || isLoadingChat) return;
@@ -65,7 +123,12 @@ export const DashboardAuditorView = ({ user, onLogout }) => {
         },
       });
 
-      const result = await response.json();
+      const responseText = await response.text();
+      if (responseText.trim().startsWith("<!DOCTYPE") || responseText.trim().startsWith("<html")) {
+        throw new Error("El backend devolvió HTML de error en el chat.");
+      }
+
+      const result = JSON.parse(responseText);
 
       if (result.status === 'error' || result.success === false) {
         throw new Error(result.message || 'Error en la respuesta del backend');
@@ -86,7 +149,6 @@ export const DashboardAuditorView = ({ user, onLogout }) => {
   return (
     <div className={`min-h-screen transition-colors duration-300 ${isDarkMode ? 'bg-[#070F18] text-white' : 'bg-slate-100 text-slate-900'}`}>
       
-      {/* Botón Menú Móvil */}
       <button
         onClick={() => setIsMobileOpen(!isMobileOpen)}
         className="md:hidden fixed top-4 left-4 z-50 bg-[#0B1726] text-white p-2.5 rounded-lg shadow-lg"
@@ -94,7 +156,6 @@ export const DashboardAuditorView = ({ user, onLogout }) => {
         ☰
       </button>
 
-      {/* Sidebar Reusable */}
       <Sidebar
         menuItems={auditorMenuItems}
         activeMenu={activeMenu}
@@ -104,7 +165,6 @@ export const DashboardAuditorView = ({ user, onLogout }) => {
         onLogout={onLogout}
       />
 
-      {/* Overlay Móvil */}
       {isMobileOpen && (
         <div 
           onClick={() => setIsMobileOpen(false)} 
@@ -112,10 +172,8 @@ export const DashboardAuditorView = ({ user, onLogout }) => {
         />
       )}
 
-      {/* Contenido Principal */}
       <main className="md:ml-60 p-4 md:p-8 pt-16 md:pt-8 transition-all">
         
-        {/* Header Superior */}
         <header className="flex flex-wrap justify-between items-center gap-4 mb-6">
           <div>
             <h1 className="text-2xl font-bold">{activeMenu}</h1>
@@ -144,52 +202,75 @@ export const DashboardAuditorView = ({ user, onLogout }) => {
           </div>
         </header>
 
-        {/* ========================================================= */}
-        {/* 1. SUBMENÚ: DASHBOARD PRINCIPAL */}
-        {/* ========================================================= */}
         {activeMenu === 'Dashboard' && (
           <>
+            {/* TARJETAS KPI ENLAZADAS AL KARDEX CONSOLIDADO REAL */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <KpiCard title="STOCK TOTAL" value="1.256" isDarkMode={isDarkMode} />
-              <KpiCard title="ENTRADAS (HOY)" value="325" isDarkMode={isDarkMode} />
-              <KpiCard title="SALIDAS (HOY)" value="217" isDarkMode={isDarkMode} />
-              <KpiCard title="PÉRDIDAS (HOY)" value="12" isDarkMode={isDarkMode} />
+              <KpiCard title="STOCK TOTAL" value={auditoria.totalStock} isDarkMode={isDarkMode} />
+              <KpiCard title="ENTRADAS TOTALES" value={auditoria.totalEntradas} isDarkMode={isDarkMode} />
+              <KpiCard title="SALIDAS TOTALES" value={auditoria.totalSalidas} isDarkMode={isDarkMode} />
+              <KpiCard title="PÉRDIDAS TOTALES" value={auditoria.totalPerdidaDinero} isDarkMode={isDarkMode} />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-[#0D1B2A] border-[#1E293B]' : 'bg-white border-slate-200'}`}>
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">RESUMEN DE INVENTARIO</h3>
-                <div className="h-44 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl flex items-center justify-center text-slate-400 font-medium">
-                  📈 [Gráfico de Tendencia]
+            <div className={`p-5 rounded-2xl border mb-6 ${isDarkMode ? 'bg-[#0D1B2A] border-[#1E293B]' : 'bg-white border-slate-200'}`}>
+              <div className="flex justify-between items-center mb-4">
+                <div>
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">AUDITORÍA DE MERMAS, FALTANTES Y DAÑADOS (KARDEX CONSOLIDADO)</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">Total ítems afectados: {auditoria.itemsAfectados?.length || 0}</p>
                 </div>
+                <button
+                  onClick={fetchAuditoriaTotal}
+                  disabled={loadingAuditoria}
+                  className="text-xs text-[#16B3B0] font-bold hover:underline flex items-center gap-1"
+                >
+                  {loadingAuditoria ? '⏳ Actualizando...' : '🔄 Actualizar Datos'}
+                </button>
               </div>
 
-              <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-[#0D1B2A] border-[#1E293B]' : 'bg-white border-slate-200'}`}>
-                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">PORCENTAJE POR CATEGORÍA</h3>
-                <div className="space-y-3">
-                  {[
-                    { cat: 'Alimentos', pct: '40%', color: 'bg-[#16B3B0]' },
-                    { cat: 'Bebidas', pct: '25%', color: 'bg-[#0B1726]' },
-                    { cat: 'Limpieza', pct: '20%', color: 'bg-sky-400' },
-                    { cat: 'Otros', pct: '15%', color: 'bg-slate-400' },
-                  ].map((item, i) => (
-                    <div key={i} className="flex justify-between items-center text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className={`w-2.5 h-2.5 rounded-full ${item.color}`} />
-                        <span>{item.cat}</span>
-                      </div>
-                      <span className="font-bold">{item.pct}</span>
-                    </div>
-                  ))}
-                </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 dark:border-slate-800 text-slate-400 text-xs uppercase tracking-wider">
+                      <th className="pb-3 font-semibold">Código / Producto</th>
+                      <th className="pb-3 font-semibold text-center">Faltantes</th>
+                      <th className="pb-3 font-semibold text-center">Dañados</th>
+                      <th className="pb-3 font-semibold">Observación</th>
+                      <th className="pb-3 font-semibold text-right">Pérdida Total ($)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
+                    {loadingAuditoria ? (
+                      <tr>
+                        <td colSpan="5" className="py-6 text-center text-slate-400 text-xs">Cargando auditoría desde Supabase y Google Sheets...</td>
+                      </tr>
+                    ) : !auditoria.itemsAfectados || auditoria.itemsAfectados.length === 0 ? (
+                      <tr>
+                        <td colSpan="5" className="py-6 text-center text-slate-400 text-xs">No hay mermas ni faltantes registrados con valores mayores a 0.</td>
+                      </tr>
+                    ) : (
+                      auditoria.itemsAfectados.map((item, index) => (
+                        <tr key={index} className="hover:bg-slate-500/5 transition-colors">
+                          <td className="py-3">
+                            <div className="font-bold">{item.nombre_producto}</div>
+                            <div className="text-xs text-slate-400 font-mono">{item.codigo_item}</div>
+                          </td>
+                          <td className="py-3 text-center font-semibold text-amber-500">{item.faltantes}</td>
+                          <td className="py-3 text-center font-semibold text-red-500">{item.danados}</td>
+                          <td className="py-3 text-slate-400 text-xs">{item.observaciones || 'Sin observaciones'}</td>
+                          <td className="py-3 text-right font-extrabold text-red-500">
+                            ${Number(item.perdida_subtotal || 0).toLocaleString('es-CO')}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </>
         )}
 
-        {/* ========================================================= */}
-        {/* 2. SUBMENÚ: CHAT IA (PROTEGIDO Y FUNCIONAL) */}
-        {/* ========================================================= */}
+        {/* CHAT IA */}
         {activeMenu === 'Chat IA' && (
           <div className="rounded-2xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-800">
             <ChatIAView 
@@ -202,16 +283,12 @@ export const DashboardAuditorView = ({ user, onLogout }) => {
           </div>
         )}
 
-        {/* ========================================================= */}
-        {/* 3. SUBMENÚ: PRECIOS Y BODEGA (CRUD CONECTADO A SUPABASE) */}
-        {/* ========================================================= */}
+        {/* PRECIOS Y BODEGA */}
         {activeMenu === 'Precios y Bodega' && (
           <PreciosBodegaModule isDarkMode={isDarkMode} />
         )}
 
-        {/* ========================================================= */}
-        {/* 4. SUBMENÚ: REPORTES Y MÉTRICAS (LOOKER STUDIO) */}
-        {/* ========================================================= */}
+        {/* REPORTES Y MÉTRICAS */}
         {activeMenu === 'Reportes y Métricas' && (
           <div className={`p-4 md:p-6 rounded-2xl border ${isDarkMode ? 'bg-[#0D1B2A] border-[#1E293B]' : 'bg-white border-slate-200'}`}>
             <div className="mb-4">
@@ -239,19 +316,17 @@ export const DashboardAuditorView = ({ user, onLogout }) => {
 };
 
 // =========================================================
-// MÓDULO PRECIOS Y BODEGA CON FETCH SEGURO (TEXT/PLAIN)
+// MÓDULO PRECIOS Y BODEGA
 // =========================================================
 function PreciosBodegaModule({ isDarkMode }) {
-  const [activeTab, setActiveTab] = useState('productos'); // 'productos' | 'bodegas'
+  const [activeTab, setActiveTab] = useState('productos');
   const [productos, setProductos] = useState([]);
   const [bodegas, setBodegas] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // Estados de formularios
   const [formProd, setFormProd] = useState({ codigo_item: '', nombre: '', categoria: '', precio: '' });
   const [formBodega, setFormBodega] = useState({ id: '', nombre: '', direccion: '', telefono: '', encargado: '' });
 
-  // Petición genérica via fetch con text/plain para evitar bloqueos CORS
   const callBackend = async (payload) => {
     const res = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
@@ -260,10 +335,13 @@ function PreciosBodegaModule({ isDarkMode }) {
         'Content-Type': 'text/plain;charset=utf-8',
       },
     });
-    return await res.json();
+    const text = await res.text();
+    if (text.trim().startsWith("<!DOCTYPE") || text.trim().startsWith("<html")) {
+      throw new Error("El backend devolvió HTML de error (Revisar permisos de ejecución).");
+    }
+    return JSON.parse(text);
   };
 
-  // Cargar datos en vivo desde Supabase
   const cargarDatosBD = async () => {
     setLoading(true);
     try {
@@ -272,7 +350,7 @@ function PreciosBodegaModule({ isDarkMode }) {
         setProductos(data.productos || []);
         setBodegas(data.bodegas || []);
       } else {
-        alert("Error al cargar datos desde Supabase: " + data.message);
+        alert("Error al cargar datos desde Supabase: " + (data.message || JSON.stringify(data)));
       }
     } catch (err) {
       console.error("Error consultando la BD:", err);
@@ -286,7 +364,6 @@ function PreciosBodegaModule({ isDarkMode }) {
     cargarDatosBD();
   }, []);
 
-  // --- ACCIONES DE PRODUCTOS ---
   const handleGuardarProducto = async (e) => {
     e.preventDefault();
     if (!formProd.codigo_item || !formProd.nombre || !formProd.precio) {
@@ -308,7 +385,7 @@ function PreciosBodegaModule({ isDarkMode }) {
         alert("Error al guardar producto: " + res.message);
       }
     } catch (err) {
-      alert("Error al guardar: " + err.message);
+        alert("Error al guardar: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -340,7 +417,6 @@ function PreciosBodegaModule({ isDarkMode }) {
     }
   };
 
-  // --- ACCIONES DE BODEGAS ---
   const handleGuardarBodega = async (e) => {
     e.preventDefault();
     if (!formBodega.nombre || !formBodega.direccion) {
@@ -402,7 +478,7 @@ function PreciosBodegaModule({ isDarkMode }) {
   return (
     <div className="space-y-6">
       
-      {/* PESTAÑAS (TABS) Y BOTÓN DE REFRESCAR BD */}
+      {/* PESTAÑAS (TABS) */}
       <div className="flex flex-wrap justify-between items-center gap-4 pb-2 border-b border-slate-200 dark:border-slate-800">
         <div className="flex items-center gap-2">
           <button
@@ -413,7 +489,7 @@ function PreciosBodegaModule({ isDarkMode }) {
                 : isDarkMode ? 'bg-[#0D1B2A] text-slate-400 hover:text-white' : 'bg-white text-slate-600'
             }`}
           >
-            <span>🏷️</span> Productos (`inv_productos`)
+            <span>🏷️</span> Productos
           </button>
 
           <button
@@ -424,7 +500,7 @@ function PreciosBodegaModule({ isDarkMode }) {
                 : isDarkMode ? 'bg-[#0D1B2A] text-slate-400 hover:text-white' : 'bg-white text-slate-600'
             }`}
           >
-            <span>🏢</span> Bodegas Registradas (`bodegas`)
+            <span>🏢</span> Bodegas Registradas
           </button>
         </div>
 
@@ -440,14 +516,11 @@ function PreciosBodegaModule({ isDarkMode }) {
         </button>
       </div>
 
-      {/* ========================================================= */}
-      {/* PESTAÑA 1: PRODUCTOS (`inv_productos`) */}
-      {/* ========================================================= */}
+      {/* PESTAÑA PRODUCTOS */}
       {activeTab === 'productos' && (
         <div className="space-y-6">
-          {/* FORMULARIO SUPERIOR: AGREGAR / EDITAR */}
           <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-[#0D1B2A] border-[#1E293B]' : 'bg-white border-slate-200'}`}>
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">REGISTRAR O ACTUALIZAR PRODUCTO (`INV_PRODUCTOS`)</h3>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">REGISTRAR O ACTUALIZAR PRODUCTO</h3>
             <form onSubmit={handleGuardarProducto} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               <input
                 type="text"
@@ -490,7 +563,6 @@ function PreciosBodegaModule({ isDarkMode }) {
             </form>
           </div>
 
-          {/* TABLA INFERIOR DE PRODUCTOS */}
           <div className={`p-5 rounded-2xl border overflow-x-auto ${isDarkMode ? 'bg-[#0D1B2A] border-[#1E293B]' : 'bg-white border-slate-200'}`}>
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">LISTADO DE PRODUCTOS EN SUPABASE ({productos.length})</h3>
             <table className="w-full text-left text-sm">
@@ -538,14 +610,11 @@ function PreciosBodegaModule({ isDarkMode }) {
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* PESTAÑA 2: BODEGAS (`bodegas`) */}
-      {/* ========================================================= */}
+      {/* PESTAÑA BODEGAS */}
       {activeTab === 'bodegas' && (
         <div className="space-y-6">
-          {/* FORMULARIO SUPERIOR: AGREGAR / EDITAR */}
           <div className={`p-5 rounded-2xl border ${isDarkMode ? 'bg-[#0D1B2A] border-[#1E293B]' : 'bg-white border-slate-200'}`}>
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">REGISTRAR O ACTUALIZAR BODEGA (`BODEGAS`)</h3>
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">REGISTRAR O ACTUALIZAR BODEGA</h3>
             <form onSubmit={handleGuardarBodega} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               <input
                 type="text"
@@ -587,7 +656,6 @@ function PreciosBodegaModule({ isDarkMode }) {
             </form>
           </div>
 
-          {/* TABLA INFERIOR DE BODEGAS */}
           <div className={`p-5 rounded-2xl border overflow-x-auto ${isDarkMode ? 'bg-[#0D1B2A] border-[#1E293B]' : 'bg-white border-slate-200'}`}>
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">BODEGAS REGISTRADAS EN SUPABASE ({bodegas.length})</h3>
             <table className="w-full text-left text-sm">
